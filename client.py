@@ -22,6 +22,9 @@ class CloudClient:
             email = input("Email: ")
             password = getpass("Pass: ")
             self.login(email, password)
+            
+        # Build Headers with auth token for future requests
+        self._headers = build_headers(token=token)
         
         self.get_device()
         
@@ -40,7 +43,7 @@ class CloudClient:
         response = request(
             "GET",
             f"{DEFAULT_BASE_URL}/getInfo",
-            headers = build_headers(self.token)
+            headers = self._headers
         )
         return response.json()
 
@@ -48,7 +51,7 @@ class CloudClient:
         response = request(
             "POST",
             f"{DEFAULT_BASE_URL}/device/deviceList",
-            headers = build_headers(self.token)
+            headers = self._headers
         )
         num_devices = len(response.json()["data"])
     
@@ -68,6 +71,31 @@ class CloudClient:
         }
         return self.device_payload
         
+    def charge_records(self, page_num: int = 1, page_size: int = 6):
+        response = request(
+            "POST",
+            f"{DEFAULT_BASE_URL}/chargeRecord/list?&pageNum={page_num}&pageSize={page_size}",
+            headers = self._headers,
+            json = {
+                "pageNum": page_num,
+                "pageSize": page_size,
+                "reasonable": True,
+            }
+        )
+        return response.json()
+
+    def restart_mainboard(self):
+        response = request(
+            "POST",
+            f"{DEFAULT_BASE_URL}/device/restartMainboard",
+            headers = self._headers,
+            json = {
+                "deviceId": self.device_payload["ccid"],
+                "ccid": self.device_payload["ccid"],
+                "qrcode": self.device_payload["qrcode"],
+            }
+        )
+        return response.json()
 
     def status(self):
         
@@ -77,21 +105,24 @@ class CloudClient:
         wsocket_url = WS_URL(self.device_payload["ccid"], self.token)
         socket = websocket.create_connection(wsocket_url, timeout=10)
 
+        time.sleep(1)
+        
         status = {
-            "PortDetail": self._getPortDetail(detail_visit_time),
-            "MainboardConfig": self._getMainboardConfig(mainboard_visit_time),
-            "WebSocket": socket.recv()
+            "PortDetail": self._getPortDetail(detail_visit_time)["data"],
+            "MainboardConfig": self._getMainboardConfig(mainboard_visit_time)["data"],
+            "WebSocket": json.loads(socket.recv())
         }
         
         socket.close()
         
         return json.dumps(status, indent=4)
+
     
     def _sendPortDetailCmd(self):
         response = request(
             "POST",
             f"{DEFAULT_BASE_URL}/device/sendPortDetailCmd",
-            headers = build_headers(self.token),
+            headers = self._headers,
             json = {
                 "deviceId": self.device_payload["ccid"],
                 "ccid": self.device_payload["ccid"],
@@ -104,7 +135,7 @@ class CloudClient:
             response = request(
                 "POST",
                 f"{DEFAULT_BASE_URL}/device/sendMainboardCmd",
-                headers = build_headers(self.token),
+                headers = self._headers,
                 json = {
                     "deviceId": self.device_payload["ccid"],
                     "ccid": self.device_payload["ccid"],
@@ -117,7 +148,7 @@ class CloudClient:
         response = request(
             "POST",
             f"{DEFAULT_BASE_URL}/device/getPortDetail",
-            headers = build_headers(self.token),
+            headers = self._headers,
             json = {
                 "time": visit_time,
                 "deviceId": self.device_payload["ccid"],
@@ -131,7 +162,7 @@ class CloudClient:
             response = request(
                 "POST",
                 f"{DEFAULT_BASE_URL}/device/getMainboardConfig",
-                headers = build_headers(self.token),
+                headers = self._headers,
                 json = {
                     "time": visit_time,
                     "deviceId": self.device_payload["ccid"],
