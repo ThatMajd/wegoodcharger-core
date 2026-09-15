@@ -11,7 +11,7 @@ DEFAULT_BASE_URL = "https://ev.weguyun.com"
 logger = logging.getLogger(__name__)
 
 
-def request(method: str, url: str, **kwargs) -> requests.Response:
+def request_raw(method: str, url: str, **kwargs) -> requests.Response:
     """Forward all options to requests.request and return its response unchanged.
 
     Make shared routing changes here before dispatching the request. Enable this
